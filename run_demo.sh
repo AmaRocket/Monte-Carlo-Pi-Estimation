@@ -1,141 +1,60 @@
 #!/bin/bash
-# Complete demo script - runs computation and displays results
+# Run Monte Carlo Pi on entire cluster, show one result on all screens
 
-APP_DIR="/export/infoTag2025/updated_scripts/applications/monte_carlo_pi"
-SCRIPTS_DIR="${APP_DIR}"
-WORK_DIR="/home/radmin/monte_carlo_demo"
-RESULTS_DIR="/home/radmin/monte_carlo_demo/results"
+SAMPLES=${1:-50000000}
 
-# Number of nodes to use (default: 64)
-NUM_NODES=${1:-64}
-SAMPLES=${2:-50000000}
+echo "========================================="
+echo "Monte Carlo Pi - Cluster Demo"
+echo "========================================="
+echo "Nodes: 64 | Processes: 256 | Samples: $SAMPLES"
+echo
 
-echo "======================================================================="
-echo "Monte Carlo Pi - Visual Cluster Demo"
-echo "======================================================================="
-echo "Nodes:   $NUM_NODES"
-echo "Samples: $SAMPLES"
-echo ""
+# Clear all screens and ALL png files first
+echo "Clearing all screens and old images..."
+for NODE in {101..164}; do
+    ssh radmin@10.0.0.$NODE "pkill -9 feh; rm -f /home/radmin/*.png /home/radmin/monte_carlo_demo/*.png /home/radmin/monte_carlo_demo/results/*.png" 2>/dev/null &
+done
+wait
+echo "Screens cleared."
+echo
 
-# Create working directory
-mkdir -p ${WORK_DIR}
-mkdir -p ${RESULTS_DIR}
+# Create hostfile for all 64 nodes
+HOSTFILE="/tmp/cluster_hostfile"
+cat > $HOSTFILE << HOSTS
+$(for i in {101..164}; do echo "10.0.0.$i slots=4"; done)
+HOSTS
 
-# Clean up old results
-echo "Cleaning old results..."
-rm -f ${RESULTS_DIR}/node_*.png
+# Run computation
+mkdir -p /home/radmin/monte_carlo_demo
+cd /export/infoTag2025/updated_scripts/applications/monte_carlo_pi
+mpirun --mca btl_tcp_if_include eth0 --hostfile $HOSTFILE -np 256 python3 monte_carlo_summary.py $SAMPLES
 
-# Create hostfile
-echo "Creating MPI hostfile..."
-HOSTFILE="${WORK_DIR}/hostfile"
+# Copy result from first node (rank 0) to login node
+echo
+echo "Fetching result from rank 0 node..."
+scp -q radmin@10.0.0.101:/home/radmin/monte_carlo_demo/cluster_result.png /home/radmin/monte_carlo_demo/
 
-cat > $HOSTFILE << 'HOSTEOF'
-10.0.0.101 slots=4
-10.0.0.102 slots=4
-10.0.0.103 slots=4
-10.0.0.104 slots=4
-10.0.0.105 slots=4
-10.0.0.106 slots=4
-10.0.0.107 slots=4
-10.0.0.108 slots=4
-10.0.0.109 slots=4
-10.0.0.110 slots=4
-10.0.0.111 slots=4
-10.0.0.112 slots=4
-10.0.0.113 slots=4
-10.0.0.114 slots=4
-10.0.0.115 slots=4
-10.0.0.116 slots=4
-10.0.0.117 slots=4
-10.0.0.118 slots=4
-10.0.0.119 slots=4
-10.0.0.120 slots=4
-10.0.0.121 slots=4
-10.0.0.122 slots=4
-10.0.0.123 slots=4
-10.0.0.124 slots=4
-10.0.0.125 slots=4
-10.0.0.126 slots=4
-10.0.0.127 slots=4
-10.0.0.128 slots=4
-10.0.0.129 slots=4
-10.0.0.130 slots=4
-10.0.0.131 slots=4
-10.0.0.132 slots=4
-10.0.0.133 slots=4
-10.0.0.134 slots=4
-10.0.0.135 slots=4
-10.0.0.136 slots=4
-10.0.0.137 slots=4
-10.0.0.138 slots=4
-10.0.0.139 slots=4
-10.0.0.140 slots=4
-10.0.0.141 slots=4
-10.0.0.142 slots=4
-10.0.0.143 slots=4
-10.0.0.144 slots=4
-10.0.0.145 slots=4
-10.0.0.146 slots=4
-10.0.0.147 slots=4
-10.0.0.148 slots=4
-10.0.0.149 slots=4
-10.0.0.150 slots=4
-10.0.0.151 slots=4
-10.0.0.152 slots=4
-10.0.0.153 slots=4
-10.0.0.154 slots=4
-10.0.0.155 slots=4
-10.0.0.156 slots=4
-10.0.0.157 slots=4
-10.0.0.158 slots=4
-10.0.0.159 slots=4
-10.0.0.160 slots=4
-10.0.0.161 slots=4
-10.0.0.162 slots=4
-10.0.0.163 slots=4
-10.0.0.164 slots=4
-HOSTEOF
+# Copy result to all nodes
+if [ -f /home/radmin/monte_carlo_demo/cluster_result.png ]; then
+    echo "Distributing result to all nodes..."
+    for NODE in {101..164}; do
+        scp -q /home/radmin/monte_carlo_demo/cluster_result.png radmin@10.0.0.$NODE:/home/radmin/cluster_result.png &
+    done
+    wait
 
-TOTAL_PROCS=$((NUM_NODES * 4))
+    # Small delay to ensure files are written
+    sleep 1
 
-cd $SCRIPTS_DIR
-
-# Run the computation (without sudo - SSH is configured for radmin user)
-echo "Running Monte Carlo computation on $TOTAL_PROCS processes..."
-echo ""
-
-mpirun --mca btl_tcp_if_include eth0  --hostfile $HOSTFILE \
-       -np $TOTAL_PROCS \
-       --map-by node \
-       --bind-to core \
-       -x RESULTS_DIR=${RESULTS_DIR} \
-       python3 visual_monte_carlo_demo.py $SAMPLES
-
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "Computation complete! Displaying results..."
-    echo ""
-
-    # Copy results back to APP_DIR for display
-    sudo rm -rf ${APP_DIR}/results/*
-    sudo cp ${RESULTS_DIR}/*.png ${APP_DIR}/results/ 2>/dev/null || cp ${RESULTS_DIR}/*.png ${APP_DIR}/results/
-
-    # Display results
+    echo "Displaying on all 64 screens..."
+    for NODE in {101..164}; do
+        ssh radmin@10.0.0.$NODE 'DISPLAY=:0 feh --fullscreen --hide-pointer --auto-zoom --no-menus /home/radmin/cluster_result.png >/tmp/feh.log 2>&1 &' </dev/null >/dev/null 2>&1 &
+    done
     sleep 2
-    ./display_results.sh
 
-    echo ""
-    echo "======================================================================="
-    echo "Demo Complete!"
-    echo "======================================================================="
-    echo ""
-    echo "All 64 screens should now show their individual contributions."
-    echo ""
-    echo "To clear displays: ./clear_displays.sh"
-    echo "To run again:      ./run_demo.sh [NUM_NODES] [SAMPLES]"
-    echo ""
+    echo
+    echo "========================================="
+    echo "Demo Complete! All screens showing result."
+    echo "========================================="
 else
-    echo ""
-    echo "Error running computation!"
-    exit 1
+    echo "Error: Result image not found"
 fi
