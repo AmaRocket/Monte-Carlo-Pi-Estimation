@@ -11,6 +11,7 @@ Current version tested on 64 Raspberry Pi worker Cluster
 5. Distributes and displays result on all screens 
 
 
+*
 1. monte_carlo_summary.py - Python visualization script 
 2. Performs Monte Carlo Pi calculation using MPI 
 3. Creates single summary visualization with:
