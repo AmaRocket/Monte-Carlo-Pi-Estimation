@@ -1,20 +1,30 @@
 # Monte-Carlo-Pi-Estimation
 Monte Carlo Pi Estimation - MVP Version Estimates Pi by randomly sampling points in a unit square
+Current version tested on 64 Raspberry Pi worker Cluster
 
+# Main Files:
 
+1. run_cluster_demo.sh - Main runner script
+◦  Clears all screens and old images
+◦  Runs MPI computation across all 64 nodes (256 processes)
+◦  Fetches result from rank 0 node
+◦  Distributes and displays result on all screens
+2. monte_carlo_summary.py - Python visualization script
+◦  Performs Monte Carlo Pi calculation using MPI
+◦  Creates single summary visualization with:
+▪  Large graph on left (75% width)
+▪  Performance box on top right (25% width, 50% height)
+▪  Cluster Results box on bottom right (25% width, 50% height)
+◦  Saves to /home/radmin/monte_carlo_demo/cluster_result.png
 
 # Run the script:
 
 Test with different sample sizes 
 
-python3 monte_carlo_pi_mvp.py -n 100000
+/run_cluster_demo.sh 10000000
 
-python3 monte_carlo_mvp.py -n 1000000000
+
 ![img.png](img.png)
-
-# Run via MPI
-mpirun -np 1 python3 monte_carlo_pi_mpi.py -n 1000000
-
 
 
 # Install OpenMPI and Python bindings
