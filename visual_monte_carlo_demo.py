@@ -8,12 +8,33 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def monte_carlo_pi(samples):
+# def monte_carlo_pi(samples):
+#     inside = 0
+#     for _ in range(samples):
+#         x, y = random.random(), random.random()
+#         if x * x + y * y <= 1.0:
+#             inside += 1
+#     return inside
+def monte_carlo_pi(samples, batch_size=10000):
     inside = 0
-    for _ in range(samples):
+    batches = samples // batch_size
+
+    for batch in range(batches):
+        for _ in range(batch_size):
+            x, y = random.random(), random.random()
+            if x * x + y * y <= 1.0:
+                inside += 1
+
+        # Brief pause every batch to reduce sustained load
+        if batch % 10 == 0:
+            time.sleep(0.001)  # 1ms pause every 100k samples
+
+    # Handle remaining samples
+    for _ in range(samples % batch_size):
         x, y = random.random(), random.random()
         if x * x + y * y <= 1.0:
             inside += 1
+
     return inside
 
 
@@ -104,6 +125,8 @@ if __name__ == "__main__":
     rank, size = comm.Get_rank(), comm.Get_size()
     samples = int(sys.argv[1]) if len(sys.argv) > 1 else 1000000
     my_samples = samples // size
+
+    time.sleep(rank * 0.1)  # 100ms delay per rank
 
     random.seed(rank + int(time.time()))
     start_time = time.time()
